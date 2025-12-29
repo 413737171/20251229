@@ -111,7 +111,7 @@ const SQUIRREL_REACT_FRAME_COUNT = 1;
 
 const QUESTION_BANK_PATH = 'math_question_bank.csv';
 
-// 關卡一題庫（隨機提問）
+// 關卡一題庫（隨機提問、但不重複）
 const LEVEL_1_QUESTIONS = [
   {
     question: '每天刷牙的主要原因是什麼？',
@@ -345,11 +345,6 @@ function setup() {
     answeredCorrectly = false;
     nextQuestionAtFrame = 0;
     lastSquirrelBubbleRect = null;
-    currentQuestionText = '';
-    currentAnswerText = '';
-    squirrelSpeechText = '';
-    pendingNextQuestion = false;
-    resetLevel1QuestionOrder();
     showStartButton(false);
     showStartHint(false);
     showRetryButton(false);
@@ -361,7 +356,6 @@ function setup() {
   });
 
   retryButtonEl.addEventListener('click', () => {
-    // 只在關卡一、碰撞中才允許重新作答
     if (!gameStarted) return;
     if (currentLevel !== 1) return;
     if (!crocSquirrelColliding) return;
@@ -629,7 +623,6 @@ function draw() {
         level2NpcX = maxX;
       }
 
-      // 若上一幀沒有在碰撞，就持續移動；碰到時暫停（方便作答）
       if (!level2IsCollidingNow && !level2Answered && !level2Completed) {
         level2NpcX += level2NpcVX;
       }
@@ -956,7 +949,7 @@ function draw() {
         isCollidingNow = colliding;
         crocSquirrelColliding = colliding;
 
-        // 每次「剛碰到」時：如果目前沒有題目，才出題（避免離開再碰到一直跳題）
+        // 每次「剛碰到」時：如果目前沒有題目，才出題（避免一直碰到就跳題、看起來像卡住）
         if (colliding && !wasColliding) {
           if (!currentQuestionText) pickNewQuestion();
           answeredCorrectly = false;
@@ -1229,20 +1222,21 @@ function drawScrollingBackground() {
 }
 
 function pickNewQuestion() {
-  // 關卡一：從題庫隨機抽一題
+  // 關卡一：從題庫依序出題（先洗牌，確保不重複）
   const pool = LEVEL_1_QUESTIONS;
   if (pool && pool.length) {
     if (!level1QuestionOrder.length || level1QuestionOrder.length !== pool.length) {
       resetLevel1QuestionOrder();
     }
     if (level1QuestionOrderPos >= level1QuestionOrder.length) {
-      // 理論上關卡一只會用到 5 題；保險起見用完就再洗一次
+      // 保險：用完就再洗一次
       resetLevel1QuestionOrder();
     }
 
     const idx = level1QuestionOrder[level1QuestionOrderPos];
     level1QuestionOrderPos += 1;
     const item = pool[idx];
+
     currentQuestionText = [item.question, ...item.choices].join('\n');
     currentAnswerText = item.answer;
     currentCorrectFeedback = '答對了！';
@@ -1256,6 +1250,7 @@ function pickNewQuestion() {
     return;
   }
 
+  // 若未提供題庫才退回 CSV（目前不會走到）
   if (!questionTable || questionTable.getRowCount() === 0) {
     currentQuestionText = '';
     currentAnswerText = '';
